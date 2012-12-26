@@ -11,6 +11,6 @@
         ]]></mx:Script>
     <mx:HBox width="100%" height="100%">
         <mx:TextArea id="test" minWidth="500" minHeight="500"/>
-        <mx:List dataProvider="{m_undoRedo.commands}" minWidth="500" minHeight="500"/>
+        <mx:DataGrid dataProvider="{m_undoRedo.commands}" rowCount="3" minWidth="500" minHeight="500"/>
     </mx:HBox>
 </mx:Application>

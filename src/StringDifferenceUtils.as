@@ -1,42 +1,40 @@
 package {
     public class StringDifferenceUtils {
-        public static var INDEX_NOT_FOUND:int = -1;
-        public static var EMPTY:String = "";
 
-        public function StringDifferenceUtils() {
-        }
-
-        public static function difference(str1:String, str2:String):String {
-            if (str1 == null) {
-                return str2;
+        public static function difference(original:String, modified:String):Difference {
+            var delta:String;
+            if (original == modified) {
+                return null;
             }
-            if (str2 == null) {
-                return str1;
+            if (original == null || modified == null) {
+                return null;
             }
-            var at:int = indexOfDifference(str1, str2);
-            if (at == INDEX_NOT_FOUND) {
-                return EMPTY;
-            }
-            return str2.substring(at);
-        }
-
-        public static function indexOfDifference(str1:String, str2:String):int {
-            if (str1 == str2) {
-                return INDEX_NOT_FOUND;
-            }
-            if (str1 == null || str2 == null) {
-                return 0;
-            }
-            var i:int;
-            for (i = 0; i < str1.length && i < str2.length; ++i) {
-                if (str1.charAt(i) != str2.charAt(i)) {
+            var firstGapIndex:int;
+            for (firstGapIndex = 0; firstGapIndex < original.length && firstGapIndex < modified.length; ++firstGapIndex) {
+                if (original.charAt(firstGapIndex) != modified.charAt(firstGapIndex)) {
                     break;
                 }
             }
-            if (i < str2.length || i < str1.length) {
-                return i;
+            var textAfterGapForOriginal:String = original.slice(firstGapIndex, original.length);
+            var textAfterGapForModified:String = modified.slice(firstGapIndex, modified.length);
+            var indexOfEndGapInModified:int = textAfterGapForModified.indexOf(textAfterGapForOriginal);
+            if (indexOfEndGapInModified != -1) { // addition of content
+                delta = textAfterGapForModified.slice(0, indexOfEndGapInModified);
+                if (delta != "") {
+                    return new Difference(firstGapIndex, delta, Difference.ADDITION_DIFFERENCE_TYPE);
+                } else {
+                    return new Difference(firstGapIndex, textAfterGapForModified, Difference.ADDITION_DIFFERENCE_TYPE);
+                }
+            } else {
+                if (textAfterGapForModified != "") {
+                    var indexOfEndGapInOriginal:int = original.indexOf(textAfterGapForModified);
+                    delta = original.slice(firstGapIndex, indexOfEndGapInOriginal);
+                    return new Difference(firstGapIndex, delta, Difference.SUBTRACTION_DIFFERENCE_TYPE);
+                } else {
+                    return new Difference(firstGapIndex, textAfterGapForOriginal, Difference.SUBTRACTION_DIFFERENCE_TYPE);
+                }
+
             }
-            return INDEX_NOT_FOUND;
         }
 
         public static function levenshteinDistance(str1:String, str2:String):int {
@@ -71,5 +69,6 @@ package {
             }
             return matrix[str1Length][str2Length];
         }
+
     }
 }
