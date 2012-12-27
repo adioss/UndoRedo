@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" creationComplete="init()">
     <mx:Script><![CDATA[
-        use namespace mx_internal;
         [Bindable]
         private var m_undoRedo:UndoRedo;
 
@@ -12,5 +11,6 @@
     <mx:HBox width="100%" height="100%">
         <mx:TextArea id="test" minWidth="500" minHeight="500"/>
         <mx:DataGrid dataProvider="{m_undoRedo.commands}" rowCount="3" minWidth="500" minHeight="500"/>
+        <mx:Text text="{m_undoRedo.currentIndex}"/>
     </mx:HBox>
 </mx:Application>

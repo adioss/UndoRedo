@@ -12,41 +12,45 @@ package {
 
         private var m_previousText:String = "";
         private var m_currentWord:String = "";
-        private var m_currentIndex:int = 0;
         private var m_textArea:TextArea;
         private var m_isChangedByUndoRedoOperation:Boolean = false;
+        private var m_isManagedByKeyBoardEvents:Boolean = false;
 
         [Bindable]
         public var commands:ArrayCollection = new ArrayCollection();
+        [Bindable]
+        public var currentIndex:int = 0;
 
         public function UndoRedo(textArea:TextArea) {
             m_textArea = textArea;
             m_textArea.addEventListener(Event.CHANGE, onTextAreaChanged);
-            m_textArea.addEventListener(KeyboardEvent.KEY_UP, onTextAreaKeyUp);
+            m_textArea.addEventListener(KeyboardEvent.KEY_DOWN, onTextAreaKeyDown);
         }
 
         //region Events
-        private function onTextAreaKeyUp(event:KeyboardEvent):void {
+        private function onTextAreaKeyDown(event:KeyboardEvent):void {
             if (event.ctrlKey && event.keyCode == Keyboard.W) {
                 undo();
             } else if (event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.Z) {
 
+            } else if (event.keyCode == Keyboard.BACKSPACE || event.keyCode == Keyboard.DELETE) {
+                m_textArea.callLater(manageBackspaceOnKeyPressed); // line break deletion not detected by text area changes...
             }
         }
 
         private function onTextAreaChanged(event:Event):void {
             if (!m_isChangedByUndoRedoOperation) {
-                manageTextChanges(m_textArea.text);
+                var currentText:String = m_textArea.text;
+                manageTextDifferences(currentText, StringDifferenceUtils.difference(m_previousText, currentText));
             }
-            m_isChangedByUndoRedoOperation = false;
+            m_isChangedByUndoRedoOperation = m_isManagedByKeyBoardEvents = false;
         }
 
         //endregion
 
-        private function manageTextChanges(currentText:String):void {
-            var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
-            if (difference.content != "") {
-                if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) {
+        private function manageTextDifferences(currentText:String, difference:Difference):void {
+            if (difference != null && difference.content != "") {
+                if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) { // addition management
                     if (difference.content.length == 1) {
                         if (difference.content == "\n" || difference.content == "\r" || difference.content == "\t") {
                             appendCurrentWord();
@@ -60,48 +64,61 @@ package {
                         }
                         append(difference);
                     }
-                } else {
-                    if (difference.content.length == 1) {
-                        appendCurrentWord();
-                        append(difference);
-                    }
+                } else { // deletion management
+                    append(difference);
                 }
                 m_previousText = currentText;
             }
         }
 
         private function append(difference:Difference):void {
-            commands.addItemAt(difference, m_currentIndex);
-            m_currentIndex++;
+            commands.addItemAt(difference, currentIndex);
+            currentIndex++;
         }
 
         private function appendCurrentWord():void {
-            commands.addItemAt(new Difference(getCorrespondingCursorPosition(m_currentWord), m_currentWord, Difference.ADDITION_DIFFERENCE_TYPE),
-                               m_currentIndex);
-            m_currentWord = "";
-            m_currentIndex++;
+            if (m_currentWord != "") {
+                var cursorPosition:int = getCorrespondingCursorPosition(m_currentWord);
+                var difference:Difference = new Difference(cursorPosition, m_currentWord, Difference.ADDITION_DIFFERENCE_TYPE);
+                commands.addItemAt(difference, currentIndex);
+                m_currentWord = "";
+                currentIndex++;
+            }
         }
 
         private function undo():void {
-            if (m_currentIndex > 0) {
+            if (currentIndex > 0) {
                 m_isChangedByUndoRedoOperation = true;
-                m_currentIndex--;
-                var difference:Difference = Difference(commands.getItemAt(m_currentIndex));
-                var text:String = m_textArea.text;
-                var s:String = text.slice(0, difference.position + (difference.content.length > 1 ? -1 : 0));
-                var s2:String = text.slice(difference.position + difference.content.length, text.length);
-                m_textArea.text = s + s2; //\r\u001A
+                currentIndex--;
+                var difference:Difference = Difference(commands.getItemAt(currentIndex));
+                var textField:String = m_textArea.getTextField().text;
+                var beginPart:String = textField.slice(0, difference.position + (difference.content.length > 1 ? -1 : 0));
+                var endPart:String = textField.slice(difference.position + difference.content.length, textField.length);
+                m_textArea.text = beginPart + endPart;
             }
         }
 
         private function redo():void {
-            if (m_currentIndex > 0) {
+            if (currentIndex > 0) {
                 m_isChangedByUndoRedoOperation = true;
+            }
+        }
+
+        private function manageBackspaceOnKeyPressed():void {
+            var currentText:String = m_textArea.getTextField().text;
+            var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
+            if (difference != null && isNewLineOrTab(difference.content)) {
+                manageTextDifferences(currentText, difference);
+                m_isManagedByKeyBoardEvents = true;
             }
         }
 
         private function getCorrespondingCursorPosition(word:String):int {
             return m_textArea.getTextField().caretIndex - word.length;
+        }
+
+        private static function isNewLineOrTab(content:String):Boolean {
+            return content == "\n" || content == "\t" || content == "\r";
         }
     }
 }
