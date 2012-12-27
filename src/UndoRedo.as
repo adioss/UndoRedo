@@ -29,9 +29,9 @@ package {
 
         //region Events
         private function onTextAreaKeyDown(event:KeyboardEvent):void {
-            if (event.ctrlKey && event.keyCode == Keyboard.W) {
+            if (isUndoKeyPressed(event)) {
                 undo();
-            } else if (event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.Z) {
+            } else if (isRedoKeyPressed(event)) {
 
             } else if (event.keyCode == Keyboard.BACKSPACE || event.keyCode == Keyboard.DELETE) {
                 m_textArea.callLater(manageBackspaceOnKeyPressed); // line break deletion not detected by text area changes...
@@ -52,7 +52,7 @@ package {
             if (difference != null && difference.content != "") {
                 if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) { // addition management
                     if (difference.content.length == 1) {
-                        if (difference.content == "\n" || difference.content == "\r" || difference.content == "\t") {
+                        if (isNewLineOrTab(difference.content)) {
                             appendCurrentWord();
                             append(difference);
                         } else {
@@ -71,6 +71,36 @@ package {
             }
         }
 
+        private function manageBackspaceOnKeyPressed():void {
+            var currentText:String = m_textArea.getTextField().text;
+            var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
+            if (difference != null && isNewLineOrTab(difference.content)) {
+                manageTextDifferences(currentText, difference);
+                m_isManagedByKeyBoardEvents = true;
+            }
+        }
+
+        private function undo():void {
+            if (currentIndex > 0) {
+                appendCurrentWord();
+                m_isChangedByUndoRedoOperation = true;
+                currentIndex--;
+                var difference:Difference = Difference(commands.getItemAt(currentIndex));
+                var textField:String = m_textArea.getTextField().text;
+                //var beginPart:String = textField.slice(0, difference.position + (difference.content.length > 1 ? -1 : 0));
+                var beginPart:String = textField.slice(0, difference.position);
+                var endPart:String = textField.slice(difference.position + difference.content.length, textField.length);
+                m_textArea.callLater(setTextAreaContent, [beginPart + endPart]);
+
+            }
+        }
+
+        private function redo():void {
+            if (currentIndex > 0) {
+                m_isChangedByUndoRedoOperation = true;
+            }
+        }
+
         private function append(difference:Difference):void {
             commands.addItemAt(difference, currentIndex);
             currentIndex++;
@@ -86,35 +116,20 @@ package {
             }
         }
 
-        private function undo():void {
-            if (currentIndex > 0) {
-                m_isChangedByUndoRedoOperation = true;
-                currentIndex--;
-                var difference:Difference = Difference(commands.getItemAt(currentIndex));
-                var textField:String = m_textArea.getTextField().text;
-                var beginPart:String = textField.slice(0, difference.position + (difference.content.length > 1 ? -1 : 0));
-                var endPart:String = textField.slice(difference.position + difference.content.length, textField.length);
-                m_textArea.text = beginPart + endPart;
-            }
-        }
-
-        private function redo():void {
-            if (currentIndex > 0) {
-                m_isChangedByUndoRedoOperation = true;
-            }
-        }
-
-        private function manageBackspaceOnKeyPressed():void {
-            var currentText:String = m_textArea.getTextField().text;
-            var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
-            if (difference != null && isNewLineOrTab(difference.content)) {
-                manageTextDifferences(currentText, difference);
-                m_isManagedByKeyBoardEvents = true;
-            }
+        private function setTextAreaContent(content:String):void {
+            m_textArea.text = m_previousText = content;
         }
 
         private function getCorrespondingCursorPosition(word:String):int {
-            return m_textArea.getTextField().caretIndex - word.length;
+            return m_textArea.getTextField().caretIndex - word.length - 1;
+        }
+
+        private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
+            return event.ctrlKey && event.keyCode == Keyboard.W;
+        }
+
+        private static function isRedoKeyPressed(event:KeyboardEvent):Boolean {
+            return event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.Z;
         }
 
         private static function isNewLineOrTab(content:String):Boolean {
