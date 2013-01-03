@@ -53,15 +53,12 @@ package {
                 if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) { // addition management
                     if (difference.content.length == 1) {
                         if (isNewLineOrTab(difference.content)) {
-                            appendCurrentWord();
-                            append(difference);
+                            appendCurrentDifferences(difference);
                         } else {
                             m_currentWord += difference.content;
                         }
                     } else {
-                        if (m_currentWord != "") {
-                            appendCurrentWord();
-                        }
+                        appendCurrentWord();
                         append(difference);
                     }
                 } else { // deletion management
@@ -82,16 +79,14 @@ package {
 
         private function undo():void {
             if (currentIndex > 0) {
-                appendCurrentWord();
+                appendCurrentWord(0);
                 m_isChangedByUndoRedoOperation = true;
                 currentIndex--;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 var textField:String = m_textArea.getTextField().text;
-                //var beginPart:String = textField.slice(0, difference.position + (difference.content.length > 1 ? -1 : 0));
                 var beginPart:String = textField.slice(0, difference.position);
                 var endPart:String = textField.slice(difference.position + difference.content.length, textField.length);
-                m_textArea.callLater(setTextAreaContent, [beginPart + endPart]);
-
+                m_textArea.callLater(setTextAreaContent, [beginPart + endPart, difference.position]);
             }
         }
 
@@ -101,31 +96,50 @@ package {
             }
         }
 
+        private function appendCurrentDifferences(difference:Difference):void {
+            appendCurrentWord();
+            append(difference);
+        }
+
         private function append(difference:Difference):void {
-            commands.addItemAt(difference, currentIndex);
+            appendItem(difference);
             currentIndex++;
         }
 
-        private function appendCurrentWord():void {
+        private function appendCurrentWord(delta:int = -1):void {
             if (m_currentWord != "") {
-                var cursorPosition:int = getCorrespondingCursorPosition(m_currentWord);
+                var cursorPosition:int = getCorrespondingCursorPosition(m_currentWord, delta);
                 var difference:Difference = new Difference(cursorPosition, m_currentWord, Difference.ADDITION_DIFFERENCE_TYPE);
-                commands.addItemAt(difference, currentIndex);
+                appendItem(difference);
                 m_currentWord = "";
                 currentIndex++;
             }
         }
 
-        private function setTextAreaContent(content:String):void {
-            m_textArea.text = m_previousText = content;
+        private function appendItem(difference:Difference):void {
+            if (commands.length > currentIndex) {
+                commands = new ArrayCollection(commands.toArray().slice(0, currentIndex));
+            }
+            commands.addItemAt(difference, currentIndex);
         }
 
-        private function getCorrespondingCursorPosition(word:String):int {
-            return m_textArea.getTextField().caretIndex - word.length - 1;
+        private function setTextAreaContent(content:String, focusPosition:int):void {
+            m_textArea.text = m_previousText = content;
+            m_textArea.callLater(extracted, [focusPosition]);
+        }
+
+        private function extracted(focusPosition:int):void {
+            m_textArea.setSelection(focusPosition, focusPosition);
+            m_textArea.setFocus();
+        }
+
+        private function getCorrespondingCursorPosition(word:String, delta:int = -1):int {
+            return m_textArea.getTextField().caretIndex - word.length + delta;
         }
 
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
-            return event.ctrlKey && event.keyCode == Keyboard.W;
+            //return event.ctrlKey && event.keyCode == Keyboard.W; // pb in mac
+            return event.ctrlKey && event.keyCode == Keyboard.Z;
         }
 
         private static function isRedoKeyPressed(event:KeyboardEvent):Boolean {
