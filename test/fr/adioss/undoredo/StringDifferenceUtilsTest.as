@@ -1,4 +1,6 @@
-package {
+package fr.adioss.undoredo {
+    import fr.adioss.undoredo.model.Difference;
+
     import org.flexunit.Assert;
 
     public class StringDifferenceUtilsTest {

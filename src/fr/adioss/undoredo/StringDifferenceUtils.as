@@ -1,4 +1,6 @@
-package {
+package fr.adioss.undoredo {
+    import fr.adioss.undoredo.model.Difference;
+
     public class StringDifferenceUtils {
 
         public static function difference(original:String, modified:String):Difference {

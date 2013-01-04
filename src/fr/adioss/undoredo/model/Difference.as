@@ -1,4 +1,4 @@
-package {
+package fr.adioss.undoredo.model {
     public class Difference {
         public static const ADDITION_DIFFERENCE_TYPE:String = "ADDITION_DIFFERENCE_TYPE";
         public static const SUBTRACTION_DIFFERENCE_TYPE:String = "SUBTRACTION_DIFFERENCE_TYPE";
