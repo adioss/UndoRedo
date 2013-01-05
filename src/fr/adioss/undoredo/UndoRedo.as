@@ -1,6 +1,7 @@
 package fr.adioss.undoredo {
     import flash.events.Event;
     import flash.events.KeyboardEvent;
+    import flash.text.TextField;
     import flash.ui.Keyboard;
 
     import fr.adioss.undoredo.model.Difference;
@@ -16,8 +17,8 @@ package fr.adioss.undoredo {
         private var m_previousText:String = "";
         private var m_currentProcessedWord:ProcessedWord;
         private var m_textArea:TextArea;
+        private var m_textField:TextField;
         private var m_isChangedByUndoRedoOperation:Boolean = false;
-        private var m_isManagedByKeyBoardEvents:Boolean = false;
 
         [Bindable]
         public var commands:ArrayCollection = new ArrayCollection();
@@ -26,6 +27,7 @@ package fr.adioss.undoredo {
 
         public function UndoRedo(textArea:TextArea) {
             m_textArea = textArea;
+            m_textField = TextField(m_textArea.getTextField());
             m_textArea.addEventListener(Event.CHANGE, onTextAreaChanged);
             m_textArea.addEventListener(KeyboardEvent.KEY_DOWN, onTextAreaKeyDown);
         }
@@ -43,10 +45,13 @@ package fr.adioss.undoredo {
 
         private function onTextAreaChanged(event:Event):void {
             if (!m_isChangedByUndoRedoOperation) {
-                var currentText:String = escapeSubstituteChars(m_textArea);
-                manageTextDifferences(currentText, StringDifferenceUtils.difference(m_previousText, currentText));
+                var currentText:String = escapeSubstituteCharsOnTextField(m_textField);
+                var previousText:String = escapeSubstituteChars(m_previousText);
+                if (currentText != "") {
+                    manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
+                }
             }
-            m_isChangedByUndoRedoOperation = m_isManagedByKeyBoardEvents = false;
+            m_isChangedByUndoRedoOperation = false;
         }
 
         //endregion
@@ -79,11 +84,10 @@ package fr.adioss.undoredo {
         }
 
         private function manageBackspaceOnKeyPressed():void {
-            var currentText:String = m_textArea.getTextField().text;
+            var currentText:String = m_textField.text;
             var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
             if (difference != null && isNewLineOrTab(difference.content)) {
                 manageTextDifferences(currentText, difference);
-                m_isManagedByKeyBoardEvents = true;
             }
         }
 
@@ -93,14 +97,10 @@ package fr.adioss.undoredo {
                 m_isChangedByUndoRedoOperation = true;
                 currentIndex--;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
-                var textField:String = m_textArea.getTextField().text;
-                var beginPart:String = textField.slice(0, difference.position);
-                var endPart:String = textField.slice(difference.position + difference.content.length, textField.length);
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    endPart = difference.content + endPart;
-                    m_textArea.callLater(setTextAreaContent, [beginPart + endPart, difference.position + difference.content.length]);
+                    m_textArea.callLater(modifyTextAreaContent, [difference.content, difference.position , difference.position]);
                 } else {
-                    m_textArea.callLater(setTextAreaContent, [beginPart + endPart, difference.position]);
+                    m_textArea.callLater(modifyTextAreaContent, ["", difference.position, difference.position + difference.content.length]);
                 }
             }
         }
@@ -138,32 +138,30 @@ package fr.adioss.undoredo {
             commands.addItemAt(difference, currentIndex);
         }
 
-        private function setTextAreaContent(content:String, focusPosition:int):void {
-            //TODO pas bon ici : il faudrait juste placer le text et non tout remplacer
-            m_textArea.text = m_previousText = content;
-            m_textArea.callLater(extracted, [focusPosition]);
-        }
-
-        private function extracted(focusPosition:int):void {
-            m_textArea.setSelection(focusPosition, focusPosition);
-            m_textArea.setFocus();
+        private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
+            m_textField.replaceText(beginIndex, endIndex, content);
+            m_previousText = m_textField.text;
         }
 
         private function getCorrespondingCursorPosition(word:String, delta:int = -1):int {
-            var caretIndex:int = m_textArea.getTextField().caretIndex;
+            var caretIndex:int = m_textField.caretIndex;
             return caretIndex - word.length + delta;
         }
 
-        private static function escapeSubstituteChars(textArea:TextArea):String {
-            var result:String = textArea.text;
-            result = result.replace(/["\u001A"]+/g, "");
-            textArea.text = result; // sorry for this...
+        private static function escapeSubstituteCharsOnTextField(textField:TextField):String {
+            var result:String = textField.text;
+            result = escapeSubstituteChars(result);
+            textField.text = result; // sorry for this...
             return result;
         }
 
+        private static function escapeSubstituteChars(result:String):String {
+            return result.replace(/["\u001A"]+/g, "");
+        }
+
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
-            //return event.ctrlKey && event.keyCode == Keyboard.W; // pb in mac
-            return event.ctrlKey && event.keyCode == Keyboard.Z;
+            return event.ctrlKey && event.keyCode == Keyboard.W; // pb in mac
+            //return event.ctrlKey && event.keyCode == Keyboard.Z;
         }
 
         private static function isRedoKeyPressed(event:KeyboardEvent):Boolean {
