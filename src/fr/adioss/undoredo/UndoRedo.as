@@ -37,7 +37,7 @@ package fr.adioss.undoredo {
             if (isUndoKeyPressed(event)) {
                 undo();
             } else if (isRedoKeyPressed(event)) {
-
+                redo();
             } else if (event.keyCode == Keyboard.BACKSPACE || event.keyCode == Keyboard.DELETE) {
                 m_textArea.callLater(manageBackspaceOnKeyPressed); // line break deletion not detected by text area changes...
             }
@@ -106,8 +106,15 @@ package fr.adioss.undoredo {
         }
 
         private function redo():void {
-            if (currentIndex > 0) {
+            if (currentIndex < commands.length) {
                 m_isChangedByUndoRedoOperation = true;
+                var difference:Difference = Difference(commands.getItemAt(currentIndex));
+                if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
+                    m_textArea.callLater(modifyTextAreaContent, ["", difference.position, difference.position + difference.content.length]);
+                } else {
+                    m_textArea.callLater(modifyTextAreaContent, [difference.content, difference.position , difference.position]);
+                }
+                currentIndex++;
             }
         }
 
@@ -160,12 +167,13 @@ package fr.adioss.undoredo {
         }
 
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
-            return event.ctrlKey && event.keyCode == Keyboard.W; // pb in mac
+            return event.ctrlKey && !event.shiftKey && event.keyCode == Keyboard.W; // pb in mac
             //return event.ctrlKey && event.keyCode == Keyboard.Z;
         }
 
         private static function isRedoKeyPressed(event:KeyboardEvent):Boolean {
-            return event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.Z;
+            //return event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.Z;
+            return event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.W;
         }
 
         private static function isNewLineOrTab(content:String):Boolean {
