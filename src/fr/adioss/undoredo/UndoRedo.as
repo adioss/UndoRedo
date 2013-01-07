@@ -84,7 +84,7 @@ package fr.adioss.undoredo {
         }
 
         private function manageBackspaceOnKeyPressed():void {
-            var currentText:String = m_textField.text;
+            var currentText:String = escapeSubstituteCharsOnTextField(m_textField);
             var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
             if (difference != null && isNewLineOrTab(difference.content)) {
                 manageTextDifferences(currentText, difference);
@@ -92,15 +92,15 @@ package fr.adioss.undoredo {
         }
 
         private function undo():void {
-            if (currentIndex > 0) {
+            if (currentIndex > 0 || (m_currentProcessedWord != null && m_currentProcessedWord.content.length > 0)) {
                 appendCurrentWord();
                 m_isChangedByUndoRedoOperation = true;
                 currentIndex--;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    m_textArea.callLater(modifyTextAreaContent, [difference.content, difference.position , difference.position]);
+                    temp(difference.content, difference.position, difference.position);
                 } else {
-                    m_textArea.callLater(modifyTextAreaContent, ["", difference.position, difference.position + difference.content.length]);
+                    temp("", difference.position, difference.position + difference.content.length);
                 }
             }
         }
@@ -110,12 +110,20 @@ package fr.adioss.undoredo {
                 m_isChangedByUndoRedoOperation = true;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    m_textArea.callLater(modifyTextAreaContent, ["", difference.position, difference.position + difference.content.length]);
+                    temp("", difference.position, difference.position + difference.content.length);
                 } else {
-                    m_textArea.callLater(modifyTextAreaContent, [difference.content, difference.position , difference.position]);
+                    var position:int = difference.position + difference.content.length;
+                    temp(difference.content, position, position);
                 }
                 currentIndex++;
             }
+        }
+
+        private function temp(content:String, beginIndex:int, endIndex:int):void {
+            modifyTextAreaContent(content, beginIndex, endIndex);
+            //m_textArea.callLater(modifyTextAreaContent, [content, beginIndex, endIndex]);
+            //m_textArea.callLater(setSelectionAndFocus, [endIndex]);
+            //setSelectionAndFocus(endIndex);
         }
 
         private function appendCurrentDifferences(difference:Difference):void {
@@ -146,8 +154,20 @@ package fr.adioss.undoredo {
         }
 
         private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
+            trace("content = " + content + " beginIndex = " + beginIndex + " endIndex = " + endIndex);
             m_textField.replaceText(beginIndex, endIndex, content);
-            m_previousText = m_textField.text;
+            m_textArea.text = m_textField.text;
+            m_previousText = escapeSubstituteChars(m_textField.text);
+            m_textArea.validateNow();
+            m_textArea.callLater(setSelectionAndFocus, [endIndex]);
+        }
+
+        private function setSelectionAndFocus(focusPosition:int):void {
+            trace("focusPosition = " + focusPosition);
+            //m_textField.setSelection(focusPosition, focusPosition);
+            m_textArea.setSelection(focusPosition, focusPosition);
+            //m_textArea.setFocus();
+            //setTimeout(title.setSelection, 100, 0, e.target.text.length);
         }
 
         private function getCorrespondingCursorPosition(word:String, delta:int = -1):int {
@@ -167,13 +187,11 @@ package fr.adioss.undoredo {
         }
 
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
-            return event.ctrlKey && !event.shiftKey && event.keyCode == Keyboard.W; // pb in mac
-            //return event.ctrlKey && event.keyCode == Keyboard.Z;
+            return event.ctrlKey && !event.shiftKey && event.charCode == 26; // ctrl + Z
         }
 
         private static function isRedoKeyPressed(event:KeyboardEvent):Boolean {
-            //return event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.Z;
-            return event.ctrlKey && event.shiftKey && event.keyCode == Keyboard.W;
+            return event.ctrlKey && event.shiftKey && event.charCode == 26; // ctrl + shift + Z
         }
 
         private static function isNewLineOrTab(content:String):Boolean {
