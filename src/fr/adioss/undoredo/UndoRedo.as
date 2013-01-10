@@ -46,7 +46,8 @@ package fr.adioss.undoredo {
 
         private function onTextAreaChanged(event:Event):void {
             if (!m_isChangedByUndoRedoOperation) {
-                var currentText:String = escapeSubstituteCharsOnTextField(m_textField);
+                escapeSubstituteCharsOnTextField();
+                var currentText:String = m_textArea.getTextField().text;
                 var previousText:String = escapeSubstituteChars(m_previousText);
                 if (currentText != "") {
                     manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
@@ -85,7 +86,8 @@ package fr.adioss.undoredo {
         }
 
         private function manageBackspaceOnKeyPressed():void {
-            var currentText:String = escapeSubstituteCharsOnTextField(m_textField);
+            escapeSubstituteCharsOnTextField();
+            var currentText:String = m_textArea.getTextField().text;
             var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
             if (difference != null && isNewLineOrTab(difference.content)) {
                 manageTextDifferences(currentText, difference);
@@ -152,7 +154,8 @@ package fr.adioss.undoredo {
 
         private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
             new TextRange(m_textArea, false, beginIndex, endIndex).text = content;
-            m_previousText = escapeSubstituteChars(m_textField.text);
+            //m_previousText = escapeSubstituteChars(m_textField.text);
+            m_previousText = m_textField.text;
             m_textArea.callLater(setSelectionAndFocus, [endIndex]);
 
         }
@@ -168,11 +171,13 @@ package fr.adioss.undoredo {
             return caretIndex - word.length + delta;
         }
 
-        private static function escapeSubstituteCharsOnTextField(textField:TextField):String {
-            var result:String = textField.text;
-            result = escapeSubstituteChars(result);
-            textField.text = result; // sorry for this...
-            return result;
+        private function escapeSubstituteCharsOnTextField():void {
+            var text:String = m_textArea.getTextField().text;
+            var substituteCharIndex:int = text.indexOf("\u001A");
+            if (substituteCharIndex != -1) {
+                m_textArea.getTextField().replaceText(substituteCharIndex, substituteCharIndex + 1, "");
+                escapeSubstituteCharsOnTextField();
+            }
         }
 
         private static function escapeSubstituteChars(result:String):String {
