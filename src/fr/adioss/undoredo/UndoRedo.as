@@ -9,6 +9,7 @@ package fr.adioss.undoredo {
 
     import mx.collections.ArrayCollection;
     import mx.controls.TextArea;
+    import mx.controls.textClasses.TextRange;
     import mx.core.mx_internal;
 
     public class UndoRedo {
@@ -98,9 +99,9 @@ package fr.adioss.undoredo {
                 currentIndex--;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    temp(difference.content, difference.position, difference.position);
+                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position);
                 } else {
-                    temp("", difference.position, difference.position + difference.content.length);
+                    modifyTextAreaContentByUndoOrRedo("", difference.position, difference.position + difference.content.length);
                 }
             }
         }
@@ -110,20 +111,16 @@ package fr.adioss.undoredo {
                 m_isChangedByUndoRedoOperation = true;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    temp("", difference.position, difference.position + difference.content.length);
+                    modifyTextAreaContentByUndoOrRedo("", difference.position, difference.position + difference.content.length);
                 } else {
-                    var position:int = difference.position + difference.content.length;
-                    temp(difference.content, position, position);
+                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position + difference.content.length);
                 }
                 currentIndex++;
             }
         }
 
-        private function temp(content:String, beginIndex:int, endIndex:int):void {
-            modifyTextAreaContent(content, beginIndex, endIndex);
-            //m_textArea.callLater(modifyTextAreaContent, [content, beginIndex, endIndex]);
-            //m_textArea.callLater(setSelectionAndFocus, [endIndex]);
-            //setSelectionAndFocus(endIndex);
+        private function modifyTextAreaContentByUndoOrRedo(content:String, beginIndex:int, endIndex:int):void {
+            m_textArea.callLater(modifyTextAreaContent, [content, beginIndex, endIndex]);
         }
 
         private function appendCurrentDifferences(difference:Difference):void {
@@ -154,20 +151,16 @@ package fr.adioss.undoredo {
         }
 
         private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
-            trace("content = " + content + " beginIndex = " + beginIndex + " endIndex = " + endIndex);
-            m_textField.replaceText(beginIndex, endIndex, content);
-            m_textArea.text = m_textField.text;
+            new TextRange(m_textArea, false, beginIndex, endIndex).text = content;
             m_previousText = escapeSubstituteChars(m_textField.text);
-            m_textArea.validateNow();
             m_textArea.callLater(setSelectionAndFocus, [endIndex]);
+
         }
 
         private function setSelectionAndFocus(focusPosition:int):void {
-            trace("focusPosition = " + focusPosition);
-            //m_textField.setSelection(focusPosition, focusPosition);
-            m_textArea.setSelection(focusPosition, focusPosition);
-            //m_textArea.setFocus();
-            //setTimeout(title.setSelection, 100, 0, e.target.text.length);
+            m_textArea.selectionBeginIndex = focusPosition + 1;
+            m_textArea.selectionEndIndex = focusPosition + 1;
+            m_textArea.setFocus();
         }
 
         private function getCorrespondingCursorPosition(word:String, delta:int = -1):int {
