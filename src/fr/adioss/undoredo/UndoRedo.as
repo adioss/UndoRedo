@@ -20,6 +20,7 @@ package fr.adioss.undoredo {
         private var m_textArea:TextArea;
         private var m_textField:TextField;
         private var m_isChangedByUndoRedoOperation:Boolean = false;
+        private var m_isAlreadyManagedByKeyDown:Boolean = false;
 
         [Bindable]
         public var commands:ArrayCollection = new ArrayCollection();
@@ -31,17 +32,31 @@ package fr.adioss.undoredo {
             m_textField = TextField(m_textArea.getTextField());
             m_textArea.addEventListener(Event.CHANGE, onTextAreaChanged);
             m_textArea.addEventListener(KeyboardEvent.KEY_DOWN, onTextAreaKeyDown);
+            m_textArea.addEventListener(KeyboardEvent.KEY_UP, onTextAreaKeyUp);
         }
 
         //region Events
+
         private function onTextAreaKeyDown(event:KeyboardEvent):void {
-            if (isUndoKeyPressed(event)) {
-                undo();
-            } else if (isRedoKeyPressed(event)) {
-                redo();
-            } else if (event.keyCode == Keyboard.BACKSPACE || event.keyCode == Keyboard.DELETE) {
-                m_textArea.callLater(manageBackspaceOnKeyPressed); // line break deletion not detected by text area changes...
+            manageKeyboardEvent(event, false);
+        }
+
+        private function onTextAreaKeyUp(event:KeyboardEvent):void {
+            manageKeyboardEvent(event, true);
+        }
+
+        private function manageKeyboardEvent(event:KeyboardEvent, isManageByKeyUp:Boolean):void {
+            trace(event);
+            if (isManageByKeyUp && !m_isAlreadyManagedByKeyDown || !isManageByKeyUp) {
+                if (isUndoKeyPressed(event)) {
+                    undo();
+                } else if (isRedoKeyPressed(event)) {
+                    redo();
+                } else if (event.keyCode == Keyboard.BACKSPACE || event.keyCode == Keyboard.DELETE) {
+                    m_textArea.callLater(manageBackspaceOnKeyPressed); // line break deletion not detected by text area changes...
+                }
             }
+            m_isAlreadyManagedByKeyDown = m_isAlreadyManagedByKeyDown && isManageByKeyUp;
         }
 
         private function onTextAreaChanged(event:Event):void {
@@ -154,7 +169,6 @@ package fr.adioss.undoredo {
 
         private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
             new TextRange(m_textArea, false, beginIndex, endIndex).text = content;
-            //m_previousText = escapeSubstituteChars(m_textField.text);
             m_previousText = m_textField.text;
             m_textArea.callLater(setSelectionAndFocus, [endIndex]);
 
@@ -185,11 +199,15 @@ package fr.adioss.undoredo {
         }
 
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
-            return event.ctrlKey && !event.shiftKey && event.charCode == 26; // ctrl + Z
+            // ctrl + Z
+            return (event.ctrlKey && !event.shiftKey && event.charCode == 26) || //mac
+                    (event.ctrlKey && !event.shiftKey && event.keyCode == 90);  // windows
         }
 
         private static function isRedoKeyPressed(event:KeyboardEvent):Boolean {
-            return event.ctrlKey && event.shiftKey && event.charCode == 26; // ctrl + shift + Z
+            // ctrl + shift + Z
+            return (event.ctrlKey && event.shiftKey && event.charCode == 26) || // mac
+                    (event.ctrlKey && event.shiftKey && event.keyCode == 90); // windows
         }
 
         private static function isNewLineOrTab(content:String):Boolean {
