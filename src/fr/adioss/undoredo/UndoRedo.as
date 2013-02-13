@@ -1,8 +1,9 @@
 package fr.adioss.undoredo {
     import flash.events.Event;
     import flash.events.KeyboardEvent;
+    import flash.events.TimerEvent;
     import flash.text.TextField;
-    import flash.ui.Keyboard;
+    import flash.utils.Timer;
 
     import fr.adioss.undoredo.model.Difference;
     import fr.adioss.undoredo.model.ProcessedWord;
@@ -19,8 +20,7 @@ package fr.adioss.undoredo {
         private var m_currentProcessedWord:ProcessedWord;
         private var m_textArea:TextArea;
         private var m_textField:TextField;
-        private var m_isChangedByUndoRedoOperation:Boolean = false;
-        private var m_isAlreadyManagedByKeyDown:Boolean = false;
+        private var m_fakeBlinkCaretTimer:Timer;
 
         [Bindable]
         public var commands:ArrayCollection = new ArrayCollection();
@@ -32,43 +32,43 @@ package fr.adioss.undoredo {
             m_textField = TextField(m_textArea.getTextField());
             m_textArea.addEventListener(Event.CHANGE, onTextAreaChanged);
             m_textArea.addEventListener(KeyboardEvent.KEY_DOWN, onTextAreaKeyDown);
-            m_textArea.addEventListener(KeyboardEvent.KEY_UP, onTextAreaKeyUp);
         }
 
         //region Events
 
-        private function onTextAreaKeyDown(event:KeyboardEvent):void {
-            manageKeyboardEvent(event, false);
+        private function onTextAreaKeyDown(keyboardEvent:KeyboardEvent):void {
+            manageKeyboardEvent(keyboardEvent);
         }
 
-        private function onTextAreaKeyUp(event:KeyboardEvent):void {
-            manageKeyboardEvent(event, true);
+        private function onFakeBlinkCaretTimerComplete(event:TimerEvent):void {
+            escapeSubstituteCharsOnTextField();
+            var currentText:String = m_textArea.getTextField().text;
+            var previousText:String = escapeSubstituteChars(m_previousText);
+            manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
+            m_fakeBlinkCaretTimer.stop();
         }
 
-        private function manageKeyboardEvent(event:KeyboardEvent, isManageByKeyUp:Boolean):void {
-            trace(event);
-            if (isManageByKeyUp && !m_isAlreadyManagedByKeyDown || !isManageByKeyUp) {
-                if (isUndoKeyPressed(event)) {
-                    undo();
-                } else if (isRedoKeyPressed(event)) {
-                    redo();
-                } else if (event.keyCode == Keyboard.BACKSPACE || event.keyCode == Keyboard.DELETE) {
-                    m_textArea.callLater(manageBackspaceOnKeyPressed); // line break deletion not detected by text area changes...
-                }
+        private function manageKeyboardEvent(keyboardEvent:KeyboardEvent):void {
+            if (isUndoKeyPressed(keyboardEvent)) {
+                undo();
+            } else if (isRedoKeyPressed(keyboardEvent)) {
+                redo();
+            } else {
+                manageBackspaceOnKeyPressed();
             }
-            m_isAlreadyManagedByKeyDown = m_isAlreadyManagedByKeyDown && isManageByKeyUp;
         }
 
         private function onTextAreaChanged(event:Event):void {
-            if (!m_isChangedByUndoRedoOperation) {
-                escapeSubstituteCharsOnTextField();
-                var currentText:String = m_textArea.getTextField().text;
-                var previousText:String = escapeSubstituteChars(m_previousText);
-                if (currentText != "") {
-                    manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
-                }
+            resetFakeBlinkCaretTimer();
+        }
+
+        private function resetFakeBlinkCaretTimer():void {
+            if (m_fakeBlinkCaretTimer != null) {
+                m_fakeBlinkCaretTimer.stop();
             }
-            m_isChangedByUndoRedoOperation = false;
+            m_fakeBlinkCaretTimer = new Timer(500);
+            m_fakeBlinkCaretTimer.addEventListener(TimerEvent.TIMER, onFakeBlinkCaretTimerComplete);
+            m_fakeBlinkCaretTimer.start();
         }
 
         //endregion
@@ -77,15 +77,11 @@ package fr.adioss.undoredo {
             if (difference != null && difference.content != "") {
                 if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) { // addition management
                     if (difference.content.length == 1) {
-                        if (isNewLineOrTab(difference.content)) {
-                            appendCurrentDifferences(difference);
-                        } else {
-                            appendInProcessedWord(difference.content);
-                        }
+                        appendInProcessedWord(difference.content);
                     } else {
                         appendCurrentDifferences(difference);
                     }
-                } else { // deleton management
+                } else { // deletion management
                     appendCurrentDifferences(difference);
                 }
                 m_previousText = currentText;
@@ -101,7 +97,7 @@ package fr.adioss.undoredo {
         }
 
         private function manageBackspaceOnKeyPressed():void {
-            escapeSubstituteCharsOnTextField();
+            //escapeSubstituteCharsOnTextField();
             var currentText:String = m_textArea.getTextField().text;
             var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
             if (difference != null && isNewLineOrTab(difference.content)) {
@@ -109,10 +105,9 @@ package fr.adioss.undoredo {
             }
         }
 
-        private function undo():void {
+        public function undo():void {
             if (currentIndex > 0 || (m_currentProcessedWord != null && m_currentProcessedWord.content.length > 0)) {
                 appendCurrentWord();
-                m_isChangedByUndoRedoOperation = true;
                 currentIndex--;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
@@ -123,9 +118,8 @@ package fr.adioss.undoredo {
             }
         }
 
-        private function redo():void {
+        public function redo():void {
             if (currentIndex < commands.length) {
-                m_isChangedByUndoRedoOperation = true;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
                     modifyTextAreaContentByUndoOrRedo("", difference.position, difference.position + difference.content.length);
@@ -137,41 +131,36 @@ package fr.adioss.undoredo {
         }
 
         private function modifyTextAreaContentByUndoOrRedo(content:String, beginIndex:int, endIndex:int):void {
-            m_textArea.callLater(modifyTextAreaContent, [content, beginIndex, endIndex]);
+            modifyTextAreaContent(content, beginIndex, endIndex);
         }
 
         private function appendCurrentDifferences(difference:Difference):void {
             appendCurrentWord();
-            append(difference);
-        }
-
-        private function append(difference:Difference):void {
-            appendItem(difference);
-            currentIndex++;
+            appendDifferenceInCommands(difference);
         }
 
         private function appendCurrentWord():void {
             if (m_currentProcessedWord != null && m_currentProcessedWord.content != "") {
                 var difference:Difference = new Difference(m_currentProcessedWord.initialPosition, m_currentProcessedWord.content,
                                                            Difference.ADDITION_DIFFERENCE_TYPE);
-                appendItem(difference);
+                appendDifferenceInCommands(difference);
                 m_currentProcessedWord = null;
-                currentIndex++;
+
             }
         }
 
-        private function appendItem(difference:Difference):void {
+        private function appendDifferenceInCommands(difference:Difference):void {
             if (commands.length > currentIndex) {
                 commands = new ArrayCollection(commands.toArray().slice(0, currentIndex));
             }
             commands.addItemAt(difference, currentIndex);
+            currentIndex++;
         }
 
         private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
             new TextRange(m_textArea, false, beginIndex, endIndex).text = content;
             m_previousText = m_textField.text;
             m_textArea.callLater(setSelectionAndFocus, [endIndex]);
-
         }
 
         private function setSelectionAndFocus(focusPosition:int):void {
