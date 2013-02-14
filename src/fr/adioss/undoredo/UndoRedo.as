@@ -16,6 +16,8 @@ package fr.adioss.undoredo {
     public class UndoRedo {
         use namespace mx_internal;
 
+        private static const FAKE_BLINK_CARET_TIMER_DELAY:int = 500;
+
         private var m_previousText:String = "";
         private var m_currentProcessedWord:ProcessedWord;
         private var m_textArea:TextArea;
@@ -66,7 +68,7 @@ package fr.adioss.undoredo {
             if (m_fakeBlinkCaretTimer != null) {
                 m_fakeBlinkCaretTimer.stop();
             }
-            m_fakeBlinkCaretTimer = new Timer(500);
+            m_fakeBlinkCaretTimer = new Timer(FAKE_BLINK_CARET_TIMER_DELAY);
             m_fakeBlinkCaretTimer.addEventListener(TimerEvent.TIMER, onFakeBlinkCaretTimerComplete);
             m_fakeBlinkCaretTimer.start();
         }
@@ -111,7 +113,7 @@ package fr.adioss.undoredo {
                 currentIndex--;
                 var difference:Difference = Difference(commands.getItemAt(currentIndex));
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position);
+                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position + difference.content.length);
                 } else {
                     modifyTextAreaContentByUndoOrRedo("", difference.position, difference.position + difference.content.length);
                 }
