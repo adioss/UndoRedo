@@ -12,7 +12,7 @@ package fr.adioss.undoredo {
                 return null;
             }
             var firstGapIndex:int;
-            for (firstGapIndex = 0; firstGapIndex < original.length && firstGapIndex < modified.length; ++firstGapIndex) {
+            for (firstGapIndex = 0; firstGapIndex < original.length && firstGapIndex < modified.length; firstGapIndex++) {
                 if (original.charAt(firstGapIndex) != modified.charAt(firstGapIndex)) {
                     break;
                 }

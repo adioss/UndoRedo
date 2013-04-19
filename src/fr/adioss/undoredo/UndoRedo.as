@@ -1,6 +1,7 @@
 package fr.adioss.undoredo {
     import flash.events.Event;
     import flash.events.KeyboardEvent;
+    import flash.events.MouseEvent;
     import flash.events.TimerEvent;
     import flash.text.TextField;
     import flash.utils.Timer;
@@ -9,6 +10,7 @@ package fr.adioss.undoredo {
     import fr.adioss.undoredo.model.ProcessedWord;
 
     import mx.collections.ArrayCollection;
+    import mx.controls.Button;
     import mx.controls.TextArea;
     import mx.controls.textClasses.TextRange;
     import mx.core.mx_internal;
@@ -22,18 +24,40 @@ package fr.adioss.undoredo {
         private var m_currentProcessedWord:ProcessedWord;
         private var m_textArea:TextArea;
         private var m_textField:TextField;
+        private var m_undoButton:Button;
+        private var m_redoButton:Button;
+
         private var m_fakeBlinkCaretTimer:Timer;
 
         [Bindable]
-        public var commands:ArrayCollection = new ArrayCollection();
+        private var m_commands:ArrayCollection = new ArrayCollection();
         [Bindable]
-        public var currentIndex:int = 0;
+        private var m_currentIndex:int = 0;
 
-        public function UndoRedo(textArea:TextArea) {
+        public function UndoRedo(textArea:TextArea, undoButton:Button = null, redoButton:Button = null) {
             m_textArea = textArea;
             m_textField = TextField(m_textArea.getTextField());
+            m_previousText = m_textField.text;
             m_textArea.addEventListener(Event.CHANGE, onTextAreaChanged);
             m_textArea.addEventListener(KeyboardEvent.KEY_DOWN, onTextAreaKeyDown);
+            if (undoButton != null) {
+                m_undoButton = undoButton;
+                m_undoButton.addEventListener(MouseEvent.CLICK, onUndoButtonClick)
+            }
+            if (redoButton != null) {
+                m_redoButton = redoButton;
+                m_redoButton.addEventListener(MouseEvent.CLICK, onRedoButtonClick)
+            }
+        }
+
+        public function resetContext():void {
+            m_commands = new ArrayCollection();
+            m_currentIndex = 0;
+            m_previousText = m_textField.text;
+            if (m_fakeBlinkCaretTimer != null && m_fakeBlinkCaretTimer.running) {
+                m_fakeBlinkCaretTimer.removeEventListener(TimerEvent.TIMER, onFakeBlinkCaretTimerComplete);
+                m_fakeBlinkCaretTimer.stop();
+            }
         }
 
         //region Events
@@ -43,34 +67,19 @@ package fr.adioss.undoredo {
         }
 
         private function onFakeBlinkCaretTimerComplete(event:TimerEvent):void {
-            escapeSubstituteCharsOnTextField();
-            var currentText:String = m_textArea.getTextField().text;
-            var previousText:String = escapeSubstituteChars(m_previousText);
-            manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
-            m_fakeBlinkCaretTimer.stop();
-        }
-
-        private function manageKeyboardEvent(keyboardEvent:KeyboardEvent):void {
-            if (isUndoKeyPressed(keyboardEvent)) {
-                undo();
-            } else if (isRedoKeyPressed(keyboardEvent)) {
-                redo();
-            } else {
-                manageBackspaceOnKeyPressed();
-            }
+            manageCurrentTypedText();
         }
 
         private function onTextAreaChanged(event:Event):void {
             resetFakeBlinkCaretTimer();
         }
 
-        private function resetFakeBlinkCaretTimer():void {
-            if (m_fakeBlinkCaretTimer != null) {
-                m_fakeBlinkCaretTimer.stop();
-            }
-            m_fakeBlinkCaretTimer = new Timer(FAKE_BLINK_CARET_TIMER_DELAY);
-            m_fakeBlinkCaretTimer.addEventListener(TimerEvent.TIMER, onFakeBlinkCaretTimerComplete);
-            m_fakeBlinkCaretTimer.start();
+        private function onUndoButtonClick(event:MouseEvent):void {
+            undo();
+        }
+
+        private function onRedoButtonClick(event:MouseEvent):void {
+            redo();
         }
 
         //endregion
@@ -98,44 +107,6 @@ package fr.adioss.undoredo {
             }
         }
 
-        private function manageBackspaceOnKeyPressed():void {
-            //escapeSubstituteCharsOnTextField();
-            var currentText:String = m_textArea.getTextField().text;
-            var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
-            if (difference != null && isNewLineOrTab(difference.content)) {
-                manageTextDifferences(currentText, difference);
-            }
-        }
-
-        public function undo():void {
-            if (currentIndex > 0 || (m_currentProcessedWord != null && m_currentProcessedWord.content.length > 0)) {
-                appendCurrentWord();
-                currentIndex--;
-                var difference:Difference = Difference(commands.getItemAt(currentIndex));
-                if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position + difference.content.length);
-                } else {
-                    modifyTextAreaContentByUndoOrRedo("", difference.position, difference.position + difference.content.length);
-                }
-            }
-        }
-
-        public function redo():void {
-            if (currentIndex < commands.length) {
-                var difference:Difference = Difference(commands.getItemAt(currentIndex));
-                if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    modifyTextAreaContentByUndoOrRedo("", difference.position, difference.position + difference.content.length);
-                } else {
-                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position + difference.content.length);
-                }
-                currentIndex++;
-            }
-        }
-
-        private function modifyTextAreaContentByUndoOrRedo(content:String, beginIndex:int, endIndex:int):void {
-            modifyTextAreaContent(content, beginIndex, endIndex);
-        }
-
         private function appendCurrentDifferences(difference:Difference):void {
             appendCurrentWord();
             appendDifferenceInCommands(difference);
@@ -152,22 +123,91 @@ package fr.adioss.undoredo {
         }
 
         private function appendDifferenceInCommands(difference:Difference):void {
-            if (commands.length > currentIndex) {
-                commands = new ArrayCollection(commands.toArray().slice(0, currentIndex));
+            if (m_commands.length > m_currentIndex) {
+                m_commands = new ArrayCollection(m_commands.toArray().slice(0, m_currentIndex));
             }
-            commands.addItemAt(difference, currentIndex);
-            currentIndex++;
+            m_commands.addItemAt(difference, m_currentIndex);
+            m_currentIndex++;
         }
 
-        private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int):void {
+        private function manageKeyboardEvent(keyboardEvent:KeyboardEvent):void {
+            if (isUndoKeyPressed(keyboardEvent)) {
+                undo();
+            } else if (isRedoKeyPressed(keyboardEvent)) {
+                redo();
+            } else {
+                //manageBackspaceOnKeyPressed();
+            }
+        }
+
+        private function manageCurrentTypedText():void {
+            m_fakeBlinkCaretTimer.stop();
+            escapeSubstituteCharsOnTextField();
+            var currentText:String = m_textArea.getTextField().text;
+            var previousText:String = m_previousText;
+            manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
+        }
+
+        private function resetFakeBlinkCaretTimer():void {
+            if (m_fakeBlinkCaretTimer != null) {
+                m_fakeBlinkCaretTimer.stop();
+            }
+            m_fakeBlinkCaretTimer = new Timer(FAKE_BLINK_CARET_TIMER_DELAY);
+            m_fakeBlinkCaretTimer.addEventListener(TimerEvent.TIMER, onFakeBlinkCaretTimerComplete);
+            m_fakeBlinkCaretTimer.start();
+        }
+
+        private function manageBackspaceOnKeyPressed():void {
+            var currentText:String = m_textArea.getTextField().text;
+            var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
+            if (difference != null && isNewLineOrTab(difference.content)) {
+                manageTextDifferences(currentText, difference);
+            }
+        }
+
+        public function undo():void {
+            if (m_currentIndex > 0 || (m_currentProcessedWord != null && m_currentProcessedWord.content.length > 0)) {
+                appendCurrentWord();
+                if (m_fakeBlinkCaretTimer.running) {
+                    manageCurrentTypedText();
+                }
+                m_currentIndex--;
+                var difference:Difference = Difference(m_commands.getItemAt(m_currentIndex));
+                var endIndex:int = difference.position + difference.content.length;
+                if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
+                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position, endIndex);
+                } else {
+                    modifyTextAreaContentByUndoOrRedo("", difference.position, endIndex, difference.position);
+                }
+            }
+        }
+
+        public function redo():void {
+            if (m_currentIndex < m_commands.length) {
+                var difference:Difference = Difference(m_commands.getItemAt(m_currentIndex));
+                var endIndex:int = difference.position + difference.content.length;
+                if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
+                    modifyTextAreaContentByUndoOrRedo("", difference.position, endIndex, difference.position);
+                } else {
+                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position, endIndex);
+                }
+                m_currentIndex++;
+            }
+        }
+
+        private function modifyTextAreaContentByUndoOrRedo(content:String, beginIndex:int, endIndex:int, focusPosition:int):void {
+            modifyTextAreaContent(content, beginIndex, endIndex, focusPosition);
+        }
+
+        private function modifyTextAreaContent(content:String, beginIndex:int, endIndex:int, caretPosition:int):void {
             new TextRange(m_textArea, false, beginIndex, endIndex).text = content;
             m_previousText = m_textField.text;
-            m_textArea.callLater(setSelectionAndFocus, [endIndex]);
+            m_textArea.callLater(setSelectionAndFocus, [caretPosition]);
         }
 
         private function setSelectionAndFocus(focusPosition:int):void {
-            m_textArea.selectionBeginIndex = focusPosition + 1;
-            m_textArea.selectionEndIndex = focusPosition + 1;
+            m_textArea.selectionBeginIndex = focusPosition;
+            m_textArea.selectionEndIndex = focusPosition;
             m_textArea.setFocus();
         }
 
@@ -183,10 +223,6 @@ package fr.adioss.undoredo {
                 m_textArea.getTextField().replaceText(substituteCharIndex, substituteCharIndex + 1, "");
                 escapeSubstituteCharsOnTextField();
             }
-        }
-
-        private static function escapeSubstituteChars(result:String):String {
-            return result.replace(/["\u001A"]+/g, "");
         }
 
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {
