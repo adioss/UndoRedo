@@ -240,5 +240,13 @@ package fr.adioss.undoredo {
         private static function isNewLineOrTab(content:String):Boolean {
             return content == "\n" || content == "\t" || content == "\r";
         }
+
+        public function get commands():ArrayCollection {
+            return m_commands;
+        }
+
+        public function get currentIndex():Number {
+            return m_currentIndex;
+        }
     }
 }

@@ -3,7 +3,7 @@
     <mx:Script><![CDATA[
         import fr.adioss.undoredo.UndoRedo;
 
-        private var testContent:String = "  <!--<module>../carbon-trunk/carbon</module>--> \n<!--<module>../photon-trunk/photon</module>--> \n< module >";
+        private var testContent:String = "";
 
         use namespace mx_internal;
         [Bindable]
@@ -31,7 +31,7 @@
                 <mx:TextArea id="test" minWidth="500" minHeight="500" text="{testContent}"/>
                 <mx:DataGrid dataProvider="{m_undoRedo.commands}" rowCount="3" minWidth="500" minHeight="500"/>
                 <mx:Label text="current index:"/>
-                <mx:Text text="{m_undoRedo.currentIndex}"/>
+                <mx:Text text="{m_undoRedo.currentIndex.toString()}"/>
             </mx:HBox>
         </mx:VBox>
     </mx:HBox>
