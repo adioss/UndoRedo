@@ -6,6 +6,7 @@ package fr.adioss.undoredo {
     import flash.text.TextField;
     import flash.utils.Timer;
 
+    import fr.adioss.undoredo.model.ComplexDifference;
     import fr.adioss.undoredo.model.Difference;
     import fr.adioss.undoredo.model.ProcessedWord;
 
@@ -85,10 +86,10 @@ package fr.adioss.undoredo {
         //endregion
 
         private function manageTextDifferences(currentText:String, difference:Difference):void {
-            if (difference != null && difference.content != "") {
+            if (difference != null && difference.originalContentAfterPosition != "") {
                 if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) { // addition management
-                    if (difference.content.length == 1) {
-                        appendInProcessedWord(difference.content);
+                    if (difference.originalContentAfterPosition.length == 1) {
+                        appendInProcessedWord(difference.originalContentAfterPosition);
                     } else {
                         appendCurrentDifferences(difference);
                     }
@@ -142,7 +143,7 @@ package fr.adioss.undoredo {
 
         private function manageCurrentTypedText():void {
             m_fakeBlinkCaretTimer.stop();
-            escapeSubstituteCharsOnTextField();
+            //escapeSubstituteCharsOnTextField();
             var currentText:String = m_textArea.getTextField().text;
             var previousText:String = m_previousText;
             manageTextDifferences(currentText, StringDifferenceUtils.difference(previousText, currentText));
@@ -160,7 +161,7 @@ package fr.adioss.undoredo {
         private function manageBackspaceOnKeyPressed():void {
             var currentText:String = m_textArea.getTextField().text;
             var difference:Difference = StringDifferenceUtils.difference(m_previousText, currentText);
-            if (difference != null && isNewLineOrTab(difference.content)) {
+            if (difference != null && isNewLineOrTab(difference.originalContentAfterPosition)) {
                 manageTextDifferences(currentText, difference);
             }
         }
@@ -173,11 +174,16 @@ package fr.adioss.undoredo {
                 }
                 m_currentIndex--;
                 var difference:Difference = Difference(m_commands.getItemAt(m_currentIndex));
-                var endIndex:int = difference.position + difference.content.length;
+                var endIndex:int = difference.position + difference.originalContentAfterPosition.length;
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
-                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position, endIndex);
-                } else {
+                    modifyTextAreaContentByUndoOrRedo(difference.originalContentAfterPosition, difference.position, difference.position, endIndex);
+                } else if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) {
                     modifyTextAreaContentByUndoOrRedo("", difference.position, endIndex, difference.position);
+                } else if (difference.type == Difference.COMPLEX_DIFFERENCE_TYPE) {
+                    var complexDifference:ComplexDifference = ComplexDifference(difference);
+                    var afterModificationTextLength:int = estimateTextLengthAfterModification(complexDifference);
+                    modifyTextAreaContentByUndoOrRedo(complexDifference.originalContentAfterPosition, complexDifference.position, afterModificationTextLength,
+                                                      endIndex);
                 }
             }
         }
@@ -185,11 +191,16 @@ package fr.adioss.undoredo {
         public function redo():void {
             if (m_currentIndex < m_commands.length) {
                 var difference:Difference = Difference(m_commands.getItemAt(m_currentIndex));
-                var endIndex:int = difference.position + difference.content.length;
+                var endIndex:int = difference.position + difference.originalContentAfterPosition.length;
                 if (difference.type == Difference.SUBTRACTION_DIFFERENCE_TYPE) {
                     modifyTextAreaContentByUndoOrRedo("", difference.position, endIndex, difference.position);
-                } else {
-                    modifyTextAreaContentByUndoOrRedo(difference.content, difference.position, difference.position, endIndex);
+                } else if (difference.type == Difference.ADDITION_DIFFERENCE_TYPE) {
+                    modifyTextAreaContentByUndoOrRedo(difference.originalContentAfterPosition, difference.position, difference.position, endIndex);
+                } else if (difference.type == Difference.COMPLEX_DIFFERENCE_TYPE) {
+                    var complexDifference:ComplexDifference = ComplexDifference(difference);
+                    var afterModificationTextLength:int = estimateTextLengthAfterModification(complexDifference);
+                    modifyTextAreaContentByUndoOrRedo(complexDifference.modifiedContentAfterPosition, complexDifference.position, afterModificationTextLength,
+                                                      afterModificationTextLength);
                 }
                 m_currentIndex++;
             }
@@ -216,13 +227,20 @@ package fr.adioss.undoredo {
             return caretIndex - word.length + delta;
         }
 
-        private function escapeSubstituteCharsOnTextField():void {
-            var text:String = m_textArea.getTextField().text;
-            var substituteCharIndex:int = text.indexOf("\u001A");
-            if (substituteCharIndex != -1) {
-                m_textArea.getTextField().replaceText(substituteCharIndex, substituteCharIndex + 1, "");
-                escapeSubstituteCharsOnTextField();
-            }
+        //private function escapeSubstituteCharsOnTextField():void {
+        //    var text:String = m_textArea.getTextField().text;
+        //    var substituteCharIndex:int = text.indexOf("\u001A");
+        //    if (substituteCharIndex != -1) {
+        //        m_textArea.getTextField().replaceText(substituteCharIndex, substituteCharIndex + 1, "");
+        //        escapeSubstituteCharsOnTextField();
+        //    }
+        //}
+
+        private function estimateTextLengthAfterModification(complexDifference:ComplexDifference):int {
+            var afterModificationTextLength:int = complexDifference.position + complexDifference.modifiedContentAfterPosition.length;
+            var currentTextLength:int = m_textField.text.length;
+            afterModificationTextLength = afterModificationTextLength < currentTextLength ? currentTextLength : afterModificationTextLength;
+            return afterModificationTextLength;
         }
 
         private static function isUndoKeyPressed(event:KeyboardEvent):Boolean {

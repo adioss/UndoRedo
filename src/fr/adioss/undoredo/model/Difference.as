@@ -2,14 +2,15 @@ package fr.adioss.undoredo.model {
     public class Difference {
         public static const ADDITION_DIFFERENCE_TYPE:String = "ADDITION_DIFFERENCE_TYPE";
         public static const SUBTRACTION_DIFFERENCE_TYPE:String = "SUBTRACTION_DIFFERENCE_TYPE";
+        public static const COMPLEX_DIFFERENCE_TYPE:String = "COMPLEX_DIFFERENCE_TYPE";
 
         private var m_position:int;
-        private var m_content:String;
+        private var m_originalContentAfterPosition:String;
         private var m_type:String;
 
         public function Difference(position:int, content:String, type:String) {
             m_position = position;
-            m_content = content;
+            m_originalContentAfterPosition = content;
             m_type = type;
         }
 
@@ -25,12 +26,12 @@ package fr.adioss.undoredo.model {
             m_position = value;
         }
 
-        public function get content():String {
-            return m_content;
+        public function get originalContentAfterPosition():String {
+            return m_originalContentAfterPosition;
         }
 
-        public function set content(value:String):void {
-            m_content = value;
+        public function set originalContentAfterPosition(value:String):void {
+            m_originalContentAfterPosition = value;
         }
 
         public function get type():String {
@@ -42,7 +43,8 @@ package fr.adioss.undoredo.model {
         }
 
         public function toString():String {
-            return "Difference{m_position=" + String(m_position) + ",m_content=" + formatItem(String(m_content)) + ",m_type=" + String(m_type) + "}";
+            return "Difference{m_position=" + String(m_position) + ",m_originalContentAfterPosition=" + formatItem(String(m_originalContentAfterPosition))
+                    + ",m_type=" + String(m_type) + "}";
         }
     }
 }

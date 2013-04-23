@@ -3,9 +3,10 @@
     <mx:Script><![CDATA[
         import fr.adioss.undoredo.UndoRedo;
 
+        use namespace mx_internal;
+
         private var testContent:String = "";
 
-        use namespace mx_internal;
         [Bindable]
         private var m_undoRedo:UndoRedo;
 
