@@ -1,85 +1,120 @@
 package fr.adioss.undoredo {
-    import fr.adioss.undoredo.model.ComplexDifference;
-    import fr.adioss.undoredo.model.Difference;
+    import flexunit.framework.Assert;
 
-    import org.flexunit.Assert;
+    import fr.adioss.undoredo.model.Operation;
 
     public class StringDifferenceUtilsTest {
 
         [Test]
         public function shouldFindSimpleAddition():void {
-            var original:String = "";
-            var modified:String = "test";
-            var difference:Difference = StringDifferenceUtils.difference(original, modified);
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.position, 0);
-            Assert.assertEquals(difference.originalContentAfterPosition, "test");
-            Assert.assertEquals(difference.type, Difference.ADDITION_DIFFERENCE_TYPE);
+            var beforeText:String;
+            var afterText:String;
+            var differences:Array;
+            var operation:Operation;
+
+            beforeText = "test with addition";
+            afterText = "test with simple addition";
+            differences = StringDifferenceUtils.difference(beforeText, afterText);
+            Assert.assertNotNull(differences);
+            Assert.assertEquals(3, differences.length);
+            operation = differences[1] as Operation;
+            Assert.assertEquals(operation.content, "simple ");
+            Assert.assertEquals(operation.type, Operation.INSERT);
+
+            beforeText = "test with addition";
+            afterText = "test with \r addition";
+            differences = StringDifferenceUtils.difference(beforeText, afterText);
+            Assert.assertNotNull(differences);
+            Assert.assertEquals(3, differences.length);
+            operation = differences[1] as Operation;
+            Assert.assertEquals(operation.content, "\r ");
+            Assert.assertEquals(operation.type, Operation.INSERT);
         }
 
         [Test]
-        public function shouldFindSimpleSubtraction():void {
-            var original:String = "test\r";
-            var modified:String = "tes";
-            var difference:Difference = StringDifferenceUtils.difference(original, modified);
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.position, 3);
-            Assert.assertEquals(difference.originalContentAfterPosition, "t\r");
-            Assert.assertEquals(difference.type, Difference.SUBTRACTION_DIFFERENCE_TYPE);
-            original = "test\rtest\r";
-            modified = "test\rte";
-            difference = StringDifferenceUtils.difference(original, modified);
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.position, 7);
-            Assert.assertEquals(difference.originalContentAfterPosition, "st\r");
-            Assert.assertEquals(difference.type, Difference.SUBTRACTION_DIFFERENCE_TYPE);
-            original = "test\rtest\r";
-            modified = "test\rtet\r";
-            difference = StringDifferenceUtils.difference(original, modified);
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.position, 7);
-            Assert.assertEquals(difference.originalContentAfterPosition, "s");
-            Assert.assertEquals(difference.type, Difference.SUBTRACTION_DIFFERENCE_TYPE);
+        public function shouldFindSimpleDeletion():void {
+            var beforeText:String;
+            var afterText:String;
+            var differences:Array;
+            var operation:Operation;
+
+            beforeText = "test with  simple deletion";
+            afterText = "test with deletion";
+            differences = StringDifferenceUtils.difference(beforeText, afterText);
+            Assert.assertNotNull(differences);
+            Assert.assertEquals(3, differences.length);
+            operation = differences[1] as Operation;
+            Assert.assertEquals(operation.content, " simple ");
+            Assert.assertEquals(operation.type, Operation.DELETE);
+
+            beforeText = "test with \r deletion";
+            afterText = "test with deletion";
+            differences = StringDifferenceUtils.difference(beforeText, afterText);
+            Assert.assertNotNull(differences);
+            Assert.assertEquals(3, differences.length);
+            operation = differences[1] as Operation;
+            Assert.assertEquals(operation.content, "\r ");
+            Assert.assertEquals(operation.type, Operation.DELETE);
         }
 
         [Test]
-        public function shouldFindAddedText():void {
-            var original:String = "line1\rline2\rline3";
-            var modified:String = "line1\rline2\rmuchline3";
-            var difference:Difference = StringDifferenceUtils.difference(original, modified);
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.position, 12);
-            Assert.assertEquals(difference.originalContentAfterPosition, "much");
-            Assert.assertEquals(difference.type, Difference.ADDITION_DIFFERENCE_TYPE);
+        public function shouldFindMultipleAddition():void {
+            var beforeText:String;
+            var afterText:String;
+            var differences:Array;
+            var operation:Operation;
+
+            beforeText = "test with addition";
+            afterText = "Another test, the second, with complex addition";
+            differences = StringDifferenceUtils.difference(beforeText, afterText);
+            Assert.assertNotNull(differences);
+            Assert.assertEquals(6, differences.length);
+
+            operation = differences[0] as Operation;
+            Assert.assertEquals(operation.content, "Another ");
+            Assert.assertEquals(operation.type, Operation.INSERT);
+
+            operation = differences[2] as Operation;
+            Assert.assertEquals(operation.content, ", the second,");
+            Assert.assertEquals(operation.type, Operation.INSERT);
+
+            operation = differences[4] as Operation;
+            Assert.assertEquals(operation.content, " complex");
+            Assert.assertEquals(operation.type, Operation.INSERT);
         }
 
         [Test]
-        public function shouldFindDeletedText():void {
-            var original:String = "line1\rline2\rline3";
-            var modified:String = "line1\rlineline3";
-            var difference:Difference = StringDifferenceUtils.difference(original, modified);
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.position, 10);
-            Assert.assertEquals(difference.originalContentAfterPosition, "2\r");
-            Assert.assertEquals(difference.type, Difference.SUBTRACTION_DIFFERENCE_TYPE);
-        }
+        public function shouldFindMultipleAdditionAndDeletion():void {
+            var beforeText:String;
+            var afterText:String;
+            var differences:Array;
+            var operation:Operation;
 
-        [Test]
-        public function shouldFindComplexModification():void {
-            var original:String = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + "\n"
-                    + "<routes xmlns:u=\"http://www.systar.com/aluminium/camel-util\" xmlns=\"http://camel.apache.org/schema/spring\">" + "\n" + "</routes>";
-            var modified:String = "<!--<?xml version=\"1.0\" encoding=\"UTF-8\"?>-->" + "\n"
-                    + "<!--<routes xmlns:u=\"http://www.systar.com/aluminium/camel-util\" xmlns=\"http://camel.apache.org/schema/spring\">-->" + "\n"
-                    + "<!--</routes>-->";
-            var difference:ComplexDifference = ComplexDifference(StringDifferenceUtils.difference(original, modified));
-            Assert.assertNotNull(difference);
-            Assert.assertEquals(difference.type, Difference.COMPLEX_DIFFERENCE_TYPE);
-            Assert.assertEquals(difference.position, 1);
-            Assert.assertEquals(difference.originalContentAfterPosition, "?xml version=\"1.0\" encoding=\"UTF-8\"?>" + "\n"
-                    + "<routes xmlns:u=\"http://www.systar.com/aluminium/camel-util\" xmlns=\"http://camel.apache.org/schema/spring\">" + "\n" + "</routes>");
-            Assert.assertEquals(difference.modifiedContentAfterPosition, "!--<?xml version=\"1.0\" encoding=\"UTF-8\"?>-->" + "\n"
-                    + "<!--<routes xmlns:u=\"http://www.systar.com/aluminium/camel-util\" xmlns=\"http://camel.apache.org/schema/spring\">-->" + "\n"
-                    + "<!--</routes>-->");
+            beforeText = "test with deletion/addition";
+            afterText = "Another test with complex";
+            differences = StringDifferenceUtils.difference(beforeText, afterText);
+            Assert.assertNotNull(differences);
+            Assert.assertEquals(7, differences.length);
+
+            operation = differences[0] as Operation;
+            Assert.assertEquals(operation.content, "Another ");
+            Assert.assertEquals(operation.type, Operation.INSERT);
+
+            operation = differences[2] as Operation;
+            Assert.assertEquals(operation.content, "de");
+            Assert.assertEquals(operation.type, Operation.DELETE);
+
+            operation = differences[3] as Operation;
+            Assert.assertEquals(operation.content, "comp");
+            Assert.assertEquals(operation.type, Operation.INSERT);
+
+            operation = differences[5] as Operation;
+            Assert.assertEquals(operation.content, "tion/addition");
+            Assert.assertEquals(operation.type, Operation.DELETE);
+
+            operation = differences[6] as Operation;
+            Assert.assertEquals(operation.content, "x");
+            Assert.assertEquals(operation.type, Operation.INSERT);
         }
     }
 }

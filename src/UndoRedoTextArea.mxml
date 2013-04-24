@@ -5,8 +5,11 @@
 
         use namespace mx_internal;
 
+        //[Bindable]
+        //private var testContent:String = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + "\n"
+        //        + "<routes xmlns:u=\"http://www.systar.com/aluminium/camel-util\" xmlns=\"http://camel.apache.org/schema/spring\">" + "\n" + "</routes>";
+        [Bindable]
         private var testContent:String = "";
-
         [Bindable]
         private var m_undoRedo:UndoRedo;
 
@@ -31,8 +34,6 @@
             <mx:HBox>
                 <mx:TextArea id="test" minWidth="500" minHeight="500" text="{testContent}"/>
                 <mx:DataGrid dataProvider="{m_undoRedo.commands}" rowCount="3" minWidth="500" minHeight="500"/>
-                <mx:Label text="current index:"/>
-                <mx:Text text="{m_undoRedo.currentIndex.toString()}"/>
             </mx:HBox>
         </mx:VBox>
     </mx:HBox>
